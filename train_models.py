@@ -36,9 +36,10 @@ from transformers import (
 )
 from scipy.special import softmax
 
-
 LOGGER = logging.getLogger(__name__)
 
+# we want to be able to call: python train_models.py task sentiment
+AVAILABLE_TASK_NAMES = ("sentiment", "sarcasm", "emotion")
 
 # Sentiment dataset uses ``0`` for negative and ``4`` for positive samples. Map these
 # raw values to contiguous indices for the classifier while keeping the semantic
@@ -81,7 +82,6 @@ class ExperimentConfig:
 
 def prepare_dataframe(task: TaskConfig) -> pd.DataFrame:
     """Load a task-specific dataframe and normalise labels."""
-
     df = pd.read_csv(task.file_path)
     LOGGER.info("Loaded %s with %d rows", task.file_path.name, len(df))
 
@@ -93,7 +93,7 @@ def prepare_dataframe(task: TaskConfig) -> pd.DataFrame:
     df[task.label_column] = pd.to_numeric(df[task.label_column], errors="coerce")
     df = df.dropna(subset=[task.text_column, task.label_column])
 
-    # Apply optional label mapping for remapping to contiguous integers.
+    # remap labels if needed (for sentiment 0/4 -> 0/1)
     if task.label_mapping is not None:
         df = df[df[task.label_column].isin(task.label_mapping.keys())]
         LOGGER.info("Applying label mapping for %s: %s", task.name, task.label_mapping)
@@ -115,7 +115,8 @@ def tokenize_dataset(dataset: Dataset, tokenizer: AutoTokenizer, text_column: st
         )
 
     tokenized = dataset.map(_tokenize, batched=True)
-    tokenized = tokenized.rename_column("label", "labels") if "label" in tokenized.column_names else tokenized
+    if "label" in tokenized.column_names:
+        tokenized = tokenized.rename_column("label", "labels")
 
     removable_columns = [
         col
@@ -172,7 +173,7 @@ def trainer_factory(
     training_config: ExperimentConfig,
     id2label: Optional[Dict[int, str]] = None,
 ) -> Trainer:
-    """Instantiate a ``Trainer`` for a given task and run configuration."""
+    """Instantiate a Trainer for a given task and run configuration."""
 
     if id2label is None:
         id2label = {idx: f"LABEL_{idx}" for idx in range(num_labels)}
@@ -197,7 +198,7 @@ def trainer_factory(
         logging_strategy="epoch",
         save_strategy="no",
         load_best_model_at_end=False,
-        report_to=[]
+        report_to=[],
     )
 
     trainer = Trainer(
@@ -216,7 +217,6 @@ def run_cross_validation(
     train_df: pd.DataFrame,
 ) -> List[Dict[str, float]]:
     """Execute stratified K-fold cross validation and return metrics for each fold."""
-
     labels = train_df[task.label_column].to_numpy()
     skf = StratifiedKFold(n_splits=config.k_folds, shuffle=True, random_state=config.seed)
 
@@ -311,7 +311,6 @@ def summarise_metrics(metrics_list: List[Dict[str, float]]) -> Dict[str, float]:
 
 def run_task(task: TaskConfig, config: ExperimentConfig, tokenizer: AutoTokenizer) -> None:
     """Execute cross validation and hold-out evaluation for a single task."""
-
     df = prepare_dataframe(task)
 
     train_df, test_df = train_test_split(
@@ -350,8 +349,14 @@ def run_task(task: TaskConfig, config: ExperimentConfig, tokenizer: AutoTokenize
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Fine-tune DistilBERT for multiple classification tasks")
-    parser.add_argument("--model-name", default="distilbert-base-uncased", help="Pretrained transformer model identifier")
+    parser = argparse.ArgumentParser(
+        description="Fine-tune DistilBERT for sentiment, sarcasm, and emotion classification tasks"
+    )
+    parser.add_argument(
+        "--model-name",
+        default="distilbert-base-uncased",
+        help="Pretrained transformer model identifier",
+    )
     parser.add_argument("--epochs", type=int, default=1, help="Number of fine-tuning epochs")
     parser.add_argument("--batch-size", type=int, default=16, help="Per-device batch size")
     parser.add_argument("--learning-rate", type=float, default=5e-5, help="Optimizer learning rate")
@@ -361,8 +366,65 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-size", type=float, default=0.2, help="Proportion for the hold-out test split")
     parser.add_argument("--k-folds", type=int, default=5, help="Number of stratified folds for cross validation")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Directory for trainer outputs and metrics")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("outputs"),
+        help="Directory for trainer outputs and metrics",
+    )
+
+    # subcommand: python train_models.py task sentiment sarcasm
+    subparsers = parser.add_subparsers(dest="command")
+    task_parser = subparsers.add_parser(
+        "task", help="Run one or more specific tasks instead of the entire suite"
+    )
+    task_parser.add_argument(
+        "task_names",
+        nargs="+",
+        choices=AVAILABLE_TASK_NAMES,
+        help="Task identifiers to execute (sentiment, sarcasm, emotion)",
+    )
+
     return parser.parse_args()
+
+
+def build_task_configs(project_root: Path) -> Dict[str, TaskConfig]:
+    """Construct task configurations keyed by their public task names."""
+    return {
+        "sentiment": TaskConfig(
+            name="sentiment",
+            file_path=project_root / "Sentiment_Data.csv",
+            text_column="text",
+            label_column="target",
+            num_labels=2,
+            label_mapping=SENTIMENT_RAW_TO_MODEL_LABEL,
+            id2label=SENTIMENT_ID2LABEL,
+        ),
+        "sarcasm": TaskConfig(
+            name="sarcasm",
+            file_path=project_root / "Sarcasm_Data.csv",
+            text_column="comment",
+            label_column="label",
+            num_labels=2,
+            id2label={0: "not_sarcastic", 1: "sarcastic"},
+        ),
+        "emotion": TaskConfig(
+            name="emotion",
+            file_path=project_root / "Emotion_Detection_Data.csv",
+            text_column="text",
+            label_column="label",
+            num_labels=6,
+            drop_columns=["Unnamed: 0"],
+            id2label={
+                0: "sadness",
+                1: "joy",
+                2: "love",
+                3: "anger",
+                4: "fear",
+                5: "surprise",
+            },
+        ),
+    }
 
 
 def main() -> None:
@@ -388,48 +450,25 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(config.model_name, use_fast=True)
 
     project_root = Path(__file__).resolve().parent
+    task_configs = build_task_configs(project_root)
 
-    tasks = [
-        TaskConfig(
-            name="sentiment_analysis",
-            file_path=project_root / "Sentiment_Data.csv",
-            text_column="text",
-            label_column="target",
-            num_labels=2,
-            label_mapping=SENTIMENT_RAW_TO_MODEL_LABEL,
-            id2label=SENTIMENT_ID2LABEL,
-        ),
-        TaskConfig(
-            name="sarcasm_detection",
-            file_path=project_root / "Sarcasm_Data.csv",
-            text_column="comment",
-            label_column="label",
-            num_labels=2,
-            id2label={0: "not_sarcastic", 1: "sarcastic"},
-        ),
-        TaskConfig(
-            name="emotion_classification",
-            file_path=project_root / "Emotion_Detection_Data.csv",
-            text_column="text",
-            label_column="label",
-            num_labels=6,
-            drop_columns=["Unnamed: 0"],
-            id2label={
-                0: "sadness",
-                1: "joy",
-                2: "love",
-                3: "anger",
-                4: "fear",
-                5: "surprise",
-            },
-        ),
-    ]
+    # if user said: python train_models.py task sentiment
+    if args.command == "task":
+        selected_task_names = getattr(args, "task_names", [])
+    else:
+        # default: run all
+        selected_task_names = list(AVAILABLE_TASK_NAMES)
 
-    for task in tasks:
+    for task_name in selected_task_names:
+        task = task_configs[task_name]
         LOGGER.info("Starting task: %s", task.name)
         run_task(task, config, tokenizer)
 
-    LOGGER.info("All tasks completed. Metrics stored in %s", config.output_dir / "results")
+    LOGGER.info(
+        "Completed tasks: %s. Metrics stored in %s",
+        ", ".join(selected_task_names),
+        config.output_dir / "results",
+    )
 
 
 if __name__ == "__main__":
