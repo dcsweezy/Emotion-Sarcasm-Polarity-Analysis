@@ -81,8 +81,8 @@ class ExperimentConfig:
     seed: int
     output_dir: Path
     run_tag: str
-    early_stopping: bool          
-    early_stopping_patience: int
+    early_stopping: bool = False
+    early_stopping_patience: int = 1
 
 
 def prepare_dataframe(task: TaskConfig) -> pd.DataFrame:
@@ -397,6 +397,7 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="Optional tag to append to result filenames, e.g. 'ep3_bs32_lr3e5'",
     )
+
     parser.add_argument(
         "--early-stopping",
         action="store_true",
@@ -408,7 +409,6 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="Number of evaluation calls with no improvement after which to stop",
     )
-
 
     # subcommand: python train_models.py task sentiment sarcasm
     subparsers = parser.add_subparsers(dest="command")
@@ -486,6 +486,8 @@ def main() -> None:
         seed=args.seed,
         output_dir=args.output_dir,
         run_tag=args.run_tag,
+        early_stopping=args.early_stopping,
+        early_stopping_patience=args.early_stopping_patience,
     )
 
     tokenizer = AutoTokenizer.from_pretrained(config.model_name, use_fast=True)
