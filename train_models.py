@@ -247,14 +247,13 @@ def run_cross_validation(
         val_split = tokenize_dataset(val_split, tokenizer, task.text_column, config.max_length)
 
         trainer = trainer_factory(
-            task_name=f"{task.name}_fold_{fold_idx}",
+            task=task,
             output_dir=config.output_dir,
             model_name=config.model_name,
-            num_labels=task.num_labels,
             tokenizer=tokenizer,
             training_config=config,
-            id2label=task.id2label,
         )
+
 
         trainer.train_dataset = train_split
         trainer.eval_dataset = val_split
