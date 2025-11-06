@@ -33,6 +33,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
     set_seed,
+    EarlyStoppingCallback,
 )
 from scipy.special import softmax
 
@@ -63,6 +64,7 @@ class TaskConfig:
     label_mapping: Optional[Dict] = None
     id2label: Optional[Dict[int, str]] = None
     drop_columns: Optional[Iterable[str]] = None
+    early_stopping_patience: Optional[int] = None
 
 
 @dataclass
@@ -78,6 +80,9 @@ class ExperimentConfig:
     max_length: int
     seed: int
     output_dir: Path
+    run_tag: str
+    early_stopping: bool          
+    early_stopping_patience: int
 
 
 def prepare_dataframe(task: TaskConfig) -> pd.DataFrame:
@@ -163,22 +168,20 @@ def compute_metrics_builder(num_labels: int) -> callable:
 
     return _compute_metrics
 
-
 def trainer_factory(
-    task_name: str,
+    task: TaskConfig,
     output_dir: Path,
     model_name: str,
-    num_labels: int,
     tokenizer: AutoTokenizer,
     training_config: ExperimentConfig,
-    id2label: Optional[Dict[int, str]] = None,
 ) -> Trainer:
     """Instantiate a Trainer for a given task and run configuration."""
 
-    if id2label is None:
-        id2label = {idx: f"LABEL_{idx}" for idx in range(num_labels)}
+    num_labels = task.num_labels
+    id2label = task.id2label or {i: f"LABEL_{i}" for i in range(num_labels)}
+    # ✅ use correct mapping direction
     label2id = {label: idx for idx, label in id2label.items()}
-
+    
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
         num_labels=num_labels,
@@ -187,20 +190,30 @@ def trainer_factory(
     )
 
     training_args = TrainingArguments(
-        output_dir=str(output_dir / task_name),
+        output_dir=str(output_dir / task.name),
         num_train_epochs=training_config.epochs,
         per_device_train_batch_size=training_config.batch_size,
         per_device_eval_batch_size=training_config.batch_size,
         learning_rate=training_config.learning_rate,
         weight_decay=training_config.weight_decay,
         warmup_ratio=training_config.warmup_ratio,
+        evaluation_strategy="epoch",
+        logging_strategy="epoch",
+        report_to=[],
     )
+
+    callbacks = []
+    if training_config.early_stopping:
+        # prefer task-specific patience, else use global
+        patience = task.early_stopping_patience or training_config.early_stopping_patience
+        callbacks.append(EarlyStoppingCallback(early_stopping_patience=patience))
 
     trainer = Trainer(
         model=model,
         args=training_args,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics_builder(num_labels),
+        callbacks=callbacks,
     )
     return trainer
 
@@ -332,12 +345,22 @@ def run_task(task: TaskConfig, config: ExperimentConfig, tokenizer: AutoTokenize
 
     task_result = {
         "task": task.name,
+        "hyperparams": {
+            "model_name": config.model_name,
+            "epochs": config.epochs,
+            "batch_size": config.batch_size,
+            "learning_rate": config.learning_rate,
+            "k_folds": config.k_folds,
+            "run_tag": config.run_tag,
+        },
         "cross_validation": fold_metrics,
         "cross_validation_mean": fold_summary,
         "holdout_test": final_metrics,
     }
 
-    result_path = results_dir / f"{task.name}_metrics.json"
+    suffix = f"_{config.run_tag}" if config.run_tag else ""
+    result_path = results_dir / f"{task.name}{suffix}_metrics.json"
+
     with result_path.open("w", encoding="utf-8") as file:
         json.dump(task_result, file, indent=2)
     LOGGER.info("Saved metrics to %s", result_path)
@@ -368,6 +391,25 @@ def parse_args() -> argparse.Namespace:
         help="Directory for trainer outputs and metrics",
     )
 
+    parser.add_argument(
+        "--run-tag",
+        type=str,
+        default="",
+        help="Optional tag to append to result filenames, e.g. 'ep3_bs32_lr3e5'",
+    )
+    parser.add_argument(
+        "--early-stopping",
+        action="store_true",
+        help="Enable early stopping during training",
+    )
+    parser.add_argument(
+        "--early-stopping-patience",
+        type=int,
+        default=1,
+        help="Number of evaluation calls with no improvement after which to stop",
+    )
+
+
     # subcommand: python train_models.py task sentiment sarcasm
     subparsers = parser.add_subparsers(dest="command")
     task_parser = subparsers.add_parser(
@@ -394,6 +436,7 @@ def build_task_configs(project_root: Path) -> Dict[str, TaskConfig]:
             num_labels=2,
             label_mapping=SENTIMENT_RAW_TO_MODEL_LABEL,
             id2label=SENTIMENT_ID2LABEL,
+            early_stopping_patience=1,
         ),
         "sarcasm": TaskConfig(
             name="sarcasm",
@@ -402,6 +445,7 @@ def build_task_configs(project_root: Path) -> Dict[str, TaskConfig]:
             label_column="label",
             num_labels=2,
             id2label={0: "not_sarcastic", 1: "sarcastic"},
+            early_stopping_patience=2,
         ),
         "emotion": TaskConfig(
             name="emotion",
@@ -418,6 +462,7 @@ def build_task_configs(project_root: Path) -> Dict[str, TaskConfig]:
                 4: "fear",
                 5: "surprise",
             },
+            early_stopping_patience=3, 
         ),
     }
 
@@ -440,6 +485,7 @@ def main() -> None:
         max_length=args.max_length,
         seed=args.seed,
         output_dir=args.output_dir,
+        run_tag=args.run_tag,
     )
 
     tokenizer = AutoTokenizer.from_pretrained(config.model_name, use_fast=True)
