@@ -215,6 +215,8 @@ def trainer_factory(
         model=model,
         args=training_args,
         tokenizer=tokenizer,
+        train_dataset=train_dataset,    
+        eval_dataset=eval_dataset,      
         compute_metrics=compute_metrics_builder(num_labels),
         callbacks=callbacks,
     )
