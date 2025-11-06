@@ -215,6 +215,7 @@ def trainer_factory(
         compute_metrics=compute_metrics_builder(num_labels),
         callbacks=callbacks,
     )
+
     return trainer
 
 
@@ -285,13 +286,11 @@ def train_final_model(
     test_dataset = tokenize_dataset(test_dataset, tokenizer, task.text_column, config.max_length)
 
     trainer = trainer_factory(
-        task_name=f"{task.name}_final",
+        task=task,
         output_dir=config.output_dir,
         model_name=config.model_name,
-        num_labels=task.num_labels,
         tokenizer=tokenizer,
         training_config=config,
-        id2label=task.id2label,
     )
 
     trainer.train_dataset = train_dataset
