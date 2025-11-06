@@ -174,6 +174,9 @@ def trainer_factory(
     model_name: str,
     tokenizer: AutoTokenizer,
     training_config: ExperimentConfig,
+    train_dataset,         
+    eval_dataset,  
+
 ) -> Trainer:
     """Instantiate a Trainer for a given task and run configuration."""
 
@@ -252,13 +255,10 @@ def run_cross_validation(
             model_name=config.model_name,
             tokenizer=tokenizer,
             training_config=config,
+            train_dataset=train_split,
+            eval_dataset=val_split,
         )
-
-
-        trainer.train_dataset = train_split
-        trainer.eval_dataset = val_split
         trainer.train()
-
         metrics = trainer.evaluate()
         LOGGER.info("Fold %d metrics: %s", fold_idx, metrics)
         fold_metrics.append(metrics)
@@ -290,13 +290,13 @@ def train_final_model(
         model_name=config.model_name,
         tokenizer=tokenizer,
         training_config=config,
+        train_dataset=train_dataset,
+        eval_dataset=test_dataset,
     )
-
-    trainer.train_dataset = train_dataset
-    trainer.eval_dataset = test_dataset
 
     trainer.train()
     metrics = trainer.evaluate()
+
     LOGGER.info("%s final test metrics: %s", task.name, metrics)
     return metrics
 
