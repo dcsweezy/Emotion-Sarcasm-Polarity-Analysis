@@ -197,7 +197,7 @@ def trainer_factory(
         learning_rate=training_config.learning_rate,
         weight_decay=training_config.weight_decay,
         warmup_ratio=training_config.warmup_ratio,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         logging_strategy="epoch",
         report_to=[],
     )
