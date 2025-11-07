@@ -1,0 +1,38 @@
+🔹 Cleaning Emotion_Detection_Data.csv...
+Original shape: (60000, 3)
+Cleaned shape: (55200, 2)
+✅ Saved cleaned dataset to: cleaned_datasets/cleaned_Emotion_Detection_Data.csv
+
+Label distribution:
+label
+2    0.170924
+1    0.167917
+3    0.166667
+0    0.165435
+4    0.164928
+5    0.164130
+Name: proportion, dtype: float64
+------------------------------------------------------------
+
+🔹 Cleaning Sarcasm_Data.csv...
+Original shape: (20000, 2)
+Cleaned shape: (17365, 2)
+✅ Saved cleaned dataset to: cleaned_datasets/cleaned_Sarcasm_Data.csv
+
+Label distribution:
+label
+1    0.513331
+0    0.486669
+Name: proportion, dtype: float64
+------------------------------------------------------------
+
+🔹 Cleaning Sentiment_Data.csv...
+Original shape: (20000, 2)
+Cleaned shape: (18584, 2)
+✅ Saved cleaned dataset to: cleaned_datasets/cleaned_Sentiment_Data.csv
+
+Label distribution:
+target
+0    0.501722
+4    0.498278
+Name: proportion, dtype: float64
