@@ -1,3 +1,13 @@
+What the script does
+1️⃣	Reads each dataset (with the correct text + label columns)
+2️⃣	Removes unnamed columns like “Unnamed: 0”
+3️⃣	Drops empty, missing, or duplicate text rows
+4️⃣	Removes non-English text using langdetect
+5️⃣	Prints shape before and after cleaning
+6️⃣	Shows label balance (so you can check for bias)
+7️⃣	Saves cleaned CSVs into a folder cleaned_datasets/
+
+
 🔹 Cleaning Emotion_Detection_Data.csv...
 Original shape: (60000, 3)
 Cleaned shape: (55200, 2)
