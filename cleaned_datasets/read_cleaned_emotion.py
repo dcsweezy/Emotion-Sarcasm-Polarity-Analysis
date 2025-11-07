@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load cleaned dataset
-df = pd.read_csv("cleaned_datasets/cleaned_Emotion_Detection_Data.csv")
+df = pd.read_csv("cleaned_Emotion_Detection_Data.csv")
 
 # View basic info
 print("Shape:", df.shape)
