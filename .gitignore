@@ -1,0 +1,11 @@
+# Ignore training outputs and checkpoints
+outputs/
+cleaned_datasets/audit_removed/
+runs/
+cache/
+__pycache__/
+*.log
+*.tmp
+
+# Allow audit_removed folder at project root
+!audit_removed/
