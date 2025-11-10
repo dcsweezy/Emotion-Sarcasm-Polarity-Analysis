@@ -1,0 +1,9 @@
+🚀 Starting overnight tuned experiments...
+🕒 Sun 09 Nov 2025 04:47:02 AM +08
+📊 GPU monitor started (PID: 1810517)
+🔹 Running Emotion Classification (5 epochs, lr=3e-5, len=160)
+🔹 Running Sentiment Analysis (6 epochs, lr=2e-5, len=160)
+🔹 Running Sarcasm Detection (8 epochs, lr=2e-5, len=256, bs=16)
+🧹 Killing GPU monitor...
+✅ All experiments finished at Sun 09 Nov 2025 04:47:14 AM +08
+📁 Check 'logs/' for training logs and 'gpu_logs/' for GPU usage data.
