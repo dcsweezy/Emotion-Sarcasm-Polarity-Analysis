@@ -430,7 +430,7 @@ def build_task_configs(project_root: Path) -> Dict[str, TaskConfig]:
     return {
         "sentiment": TaskConfig(
             name="sentiment",
-            file_path=project_root / "Sentiment_Data.csv",
+            file_path=project_root / "Sentiment_Data_Flagless.csv",
             text_column="text",
             label_column="target",
             num_labels=2,
@@ -440,7 +440,7 @@ def build_task_configs(project_root: Path) -> Dict[str, TaskConfig]:
         ),
         "sarcasm": TaskConfig(
             name="sarcasm",
-            file_path=project_root / "Sarcasm_Data.csv",
+            file_path=project_root / "Sarcasm_Data_Flagless.csv",
             text_column="comment",
             label_column="label",
             num_labels=2,
@@ -449,7 +449,7 @@ def build_task_configs(project_root: Path) -> Dict[str, TaskConfig]:
         ),
         "emotion": TaskConfig(
             name="emotion",
-            file_path=project_root / "Emotion_Detection_Data.csv",
+            file_path=project_root / "Emotion_Detection_Data_Flagless.csv",
             text_column="text",
             label_column="label",
             num_labels=6,
