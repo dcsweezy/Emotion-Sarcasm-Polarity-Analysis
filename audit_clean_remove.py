@@ -15,7 +15,7 @@ datasets = [
 AUDIT_DIR = "audit_flagged/"
 os.makedirs(AUDIT_DIR, exist_ok=True)
 
-# words you KNOW are non-English / non-target
+#word list known to be non-English via manual spotting
 NON_EN_MARKERS = (
     "nyebelin", "udh", "udah", "juga", "cape", "capek",
     "lah", "lahh", "banget", "gitu", "aja", "aku", "kamu",
@@ -27,31 +27,25 @@ def check_language_flags(text: str):
     """
     text = str(text).strip()
     flags = []
-
     # usernames / symbols only → let it pass
     if re.match(r"^[\W_@#0-9]+$", text):
         return flags
-
     # langid classify
     lang, _ = langid.classify(text)
     text_lower = text.lower()
-
     # if main lang is not English → flag
     if lang != "en":
         flags.append("non_english")
         return flags
-
     # grab tokens
     tokens = re.findall(r"[A-Za-z]+", text)
     if not tokens:
         flags.append("non_english")
         return flags
-
     # explicit word markers for your corpus
     if any(m in text_lower for m in NON_EN_MARKERS):
         flags.append("mixed_language")
         return flags
-
     # extra strict: all alpha
     for tok in tokens:
         if not re.match(r"^[A-Za-z]+$", tok):

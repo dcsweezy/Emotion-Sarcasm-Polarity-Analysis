@@ -182,7 +182,7 @@ def trainer_factory(
 
     num_labels = task.num_labels
     id2label = task.id2label or {i: f"LABEL_{i}" for i in range(num_labels)}
-    # ✅ use correct mapping direction
+    #use correct mapping direction
     label2id = {label: idx for idx, label in id2label.items()}
     
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -495,7 +495,7 @@ def main() -> None:
     project_root = Path(__file__).resolve().parent
     task_configs = build_task_configs(project_root)
 
-    # if user said: python train_models.py task sentiment
+    # if command is to train per task: python train_models.py task sentiment
     if args.command == "task":
         selected_task_names = getattr(args, "task_names", [])
     else:
